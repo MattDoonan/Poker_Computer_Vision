@@ -6,6 +6,6 @@ export default defineNuxtConfig({
     '~/assets/css/global.scss',
   ],
   plugins: [
-    { src: '~/plugins/bootstrap.js', mode: 'client' }
+    { src: '~/plugins/bootstrap.js', mode: 'client' },
   ],
 })
