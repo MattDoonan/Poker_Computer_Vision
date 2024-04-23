@@ -3,22 +3,22 @@
     <video ref="video" autoplay></video>
     <div class="container">
       <div class="row">
-        <div class="col-4">
-          <h4>
+        <div class="col-lg-4 col-12">
+          <h3 class="mt-5">
             {{ currentCards.length > 1 ? 'Current Hand' : (currentCards.length == 1 ? 'Need 2 cards' : 'Draw two cards') }}
-          </h4>
+          </h3>
           <div class="show-cards">
             <NuxtImg :src="'/cards/' + card + '.png'" v-for="card in currentCards.slice(0, 2)"/>
           </div>
-          <h4>
+          <h4 class="mt-3 mb-1">
             {{ currentCards.length > 1 ? 'Chance of Winning: ' + chanceOfWinning.toFixed(2) + '%' : ''}}
           </h4>
           <h4>
             {{ currentCards.length > 1 ? 'Hand Ranking: ' + handRanking + '/169': ''}}
           </h4>
-          <h4>
+          <h3 class="mt-4">
             {{ currentCards.length > 1 ? (currentCards.length <= 5 ? 'Show draw for predictions' : 'Draw') : '' }}
-          </h4>
+          </h3>
           <div class="show-cards">
             <NuxtImg :src="'/cards/' + card + '.png'" v-for="card in currentCards.slice(2, 7)"/>
           </div>
