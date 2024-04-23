@@ -52,7 +52,6 @@ export default {
     }
   },
   mounted() {
-    // Access webcam stream
     navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
           this.$refs.video.srcObject = stream;
