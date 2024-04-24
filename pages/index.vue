@@ -102,17 +102,73 @@ export default {
         let ahead = 0;
         let tied = 0;
         let behind = 0;
-        const ourRank = this.calcHandRanking(this.currentCards.slice(0, 2), this.currentCards.slice(2));
+        const ourRank = this.calcHandRanking(this.currentCards.slice(0, 2), this.currentCards.slice(2, 7));
       }
     },
     calcHandRanking(ourCards:string[], bordCards:string[]) {
       const card1 = this.getCardValue(ourCards[0].substring(0, ourCards[0].length - 1));
       const card2 = this.getCardValue(ourCards[1].substring(0, ourCards[1].length - 1));
-      const isSuited = ourCards[0].substring(1, 2) == ourCards[1].substring(1, 2);
+      const card1Suite = ourCards[0].substring(ourCards[0].length - 1);
+      const card2Suite = ourCards[1].substring(ourCards[1].length - 1);
       const pairVal = this.checkPairing(card1, card2, bordCards)
-      console.log(pairVal)
+      const straightFlushValue = this.checkStraightFlush(card1, card2, bordCards, card1Suite, card2Suite)
+      console.log(straightFlushValue)
+    },
+    //Checks for any straights or flushes or both
+    checkStraightFlush(card1:number, card2:number, bordCards:string[], suite1:string, suite2:string) {
+      let ordering = [card1, card2]
+      const suites = [0, 0, 0, 0]
+      this.checkSuite(suites, suite1);
+      this.checkSuite(suites, suite2);
+      for (let card of bordCards) {
+        const cardNum = this.getCardValue(card.substring(0, 1));
+        const cardSuite = card.substring(card.length - 1);
+        this.checkSuite(suites, cardSuite);
+        ordering.push(cardNum);
+      }
+      ordering = ordering.sort((a, b) => a - b);
+      let isInOrder = false;
+      let isFlush = false;
+      let inARow = 1;
+      for (let i = 1; i < ordering.length; i++) {
+        if (ordering[i] === ordering[i - 1] + 1) {
+          inARow += 1;
+        } else {
+          inARow = 1;
+        }
+        if (inARow === 5) {
+          isInOrder = true
+        }
+      }
+      for (let i of suites) {
+        if (i >= 5) {
+          isFlush = true;
+        }
+      }
+      if (isInOrder && isFlush) {
+        if (JSON.stringify(ordering.slice(ordering.length - 5)) === JSON.stringify([9, 10, 11, 12, 13])) {
+          return 130;
+        }
+        return ordering[ordering.length - 1] + (13 * 8)
+      } else if (isFlush) {
+        return ordering[ordering.length - 1] + (13 * 5)
+      } else if (isInOrder) {
+        return ordering[ordering.length - 1] + (13 * 4)
+      }
+      return 0
     },
 
+    checkSuite(suites:number[], cardSuite:string) {
+      if (cardSuite.toUpperCase() === 'C') {
+        suites[0] += 1;
+      } else if (cardSuite.toUpperCase() === 'S') {
+        suites[1] += 1;
+      } else if (cardSuite.toUpperCase() === 'D') {
+        suites[2] += 1;
+      } else if (cardSuite.toUpperCase() === 'H') {
+        suites[3] += 1;
+      }
+    },
     /* Checks for high card, pair, two pair, three of a kind, full house and four of a kind **/
     checkPairing(card1:number, card2:number, bordCards:string[]) {
       const originalValue = Math.max(card1, card2)
@@ -123,22 +179,24 @@ export default {
       }
       for (let card of bordCards) {
         const cardNum = this.getCardValue(card.substring(0, 1));
-        if (cardNum == card1) {
+        if (cardNum === card1) {
           similarToFirstCard += 1
-        } else if (cardNum == card2) {
+        } else if (cardNum === card2) {
           similarToSecondCard += 1
         }
       }
-      if (similarToFirstCard === 4 || similarToSecondCard === 4) {
+      if (similarToFirstCard === 3 || similarToSecondCard === 3) {
         return originalValue + (13 * 7)
-      } else if ((similarToFirstCard === 3 && similarToSecondCard === 2) || (similarToFirstCard === 2 && similarToSecondCard === 3)) {
+      } else if ((similarToFirstCard === 2 && similarToSecondCard === 1) || (similarToFirstCard === 1 && similarToSecondCard === 2)) {
         return originalValue + (13 * 6)
-      } else if (similarToFirstCard === 3 || similarToSecondCard === 3) {
+      } else if (similarToFirstCard === 2 || similarToSecondCard === 2) {
         return originalValue + (13 * 3)
-      } else if (similarToFirstCard === 2 && similarToSecondCard === 2) {
+      } else if (similarToFirstCard === 1 && similarToSecondCard === 1) {
         return originalValue + (13 * 2)
+      } else if (similarToFirstCard === 1 || similarToSecondCard === 1) {
+        return originalValue + 13
       }
-      return originalValue + 13
+      return originalValue
     },
 
     clearCurrentCards() {
