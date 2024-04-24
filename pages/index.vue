@@ -14,7 +14,7 @@
             {{ currentCards.length > 1 ? 'Chance of Winning: ' + chanceOfWinning.toFixed(2) + '%' : ''}}
           </h4>
           <h4>
-            {{ currentCards.length > 1 ? 'Hand Ranking: ' + handRanking + '/169': ''}}
+            {{ currentCards.length > 1 ? 'Hand Ranking: ' + 0 + '/169': ''}}
           </h4>
           <h3 class="mt-4">
             {{ currentCards.length > 1 ? (currentCards.length <= 5 ? 'Show draw for predictions' : 'Draw') : '' }}
@@ -48,7 +48,6 @@ export default {
       cardTimes: 0,
       previousList: [],
       chanceOfWinning: 0,
-      handRanking: 169,
     }
   },
   mounted() {
@@ -100,29 +99,49 @@ export default {
   methods: {
     showHandRanking() {
       if (this.currentCards.length >= 2) {
-        const card1 = this.currentCards[0].substring(0, 1);
-        const card2 = this.currentCards[1].substring(0, 1);
-        const isSuited = this.currentCards[0].substring(1, 2) == this.currentCards[1].substring(1, 2)
-        for (let rank of possibleHands) {
-          if (
-              (card1 === rank.numbers[0] && card2 === rank.numbers[1]) ||
-              (card1 === rank.numbers[1] && card2 === rank.numbers[0])
-          ) {
-            if (rank.suited && isSuited) {
-              this.chanceOfWinning = rank.percentage;
-              this.handRanking = rank.rank;
-              return
-            } else if (!rank.suited) {
-              this.chanceOfWinning = rank.percentage;
-              this.handRanking = rank.rank;
-              return;
-            }
-          }
-        }
+        let ahead = 0;
+        let tied = 0;
+        let behind = 0;
+        const ourRank = this.calcHandRanking(this.currentCards.slice(0, 2), this.currentCards.slice(2));
       }
     },
+    calcHandRanking(ourCards:string[], bordCards:string[]) {
+      const card1 = this.getCardValue(ourCards[0].substring(0, ourCards[0].length - 1));
+      const card2 = this.getCardValue(ourCards[1].substring(0, ourCards[1].length - 1));
+      const isSuited = ourCards[0].substring(1, 2) == ourCards[1].substring(1, 2);
+      const pairVal = this.checkPairing(card1, card2, bordCards)
+      console.log(pairVal)
+    },
+
+    /* Checks for high card, pair, two pair, three of a kind, full house and four of a kind **/
+    checkPairing(card1:number, card2:number, bordCards:string[]) {
+      const originalValue = Math.max(card1, card2)
+      let similarToFirstCard = 0;
+      let similarToSecondCard = 0;
+      if (card1 == card2) {
+        similarToFirstCard += 1
+      }
+      for (let card of bordCards) {
+        const cardNum = this.getCardValue(card.substring(0, 1));
+        if (cardNum == card1) {
+          similarToFirstCard += 1
+        } else if (cardNum == card2) {
+          similarToSecondCard += 1
+        }
+      }
+      if (similarToFirstCard === 4 || similarToSecondCard === 4) {
+        return originalValue + (13 * 7)
+      } else if ((similarToFirstCard === 3 && similarToSecondCard === 2) || (similarToFirstCard === 2 && similarToSecondCard === 3)) {
+        return originalValue + (13 * 6)
+      } else if (similarToFirstCard === 3 || similarToSecondCard === 3) {
+        return originalValue + (13 * 3)
+      } else if (similarToFirstCard === 2 && similarToSecondCard === 2) {
+        return originalValue + (13 * 2)
+      }
+      return originalValue + 13
+    },
+
     clearCurrentCards() {
-      console.log("hello")
       if (this.currentCards.length !== 0) {
         this.clearTimes = this.clearTimes + 1;
       } else {
@@ -131,12 +150,10 @@ export default {
       if (this.clearTimes === 20) {
         this.currentCards = []
         this.chanceOfWinning = 0;
-        this.handRanking = 169;
         this.cardTimes = 0
       }
     },
     checkSameList(list1:string[], list2:string[]) {
-      console.log("same")
       if (list1.length !== list2.length) {
         return false;
       }
@@ -168,6 +185,46 @@ export default {
         this.currentCards = this.previousList
         this.showHandRanking()
       }
+    },
+    getCardValue(card:string) {
+      if (card === '2') {
+        return 1;
+      }
+      if (card === '3') {
+        return 2;
+      }
+      if (card === '4') {
+        return 3;
+      }
+      if (card === '5') {
+        return 4;
+      }
+      if (card === '6') {
+        return 5;
+      }
+      if (card === '7') {
+        return 6;
+      }
+      if (card === '8') {
+        return 7;
+      }
+      if (card === '9') {
+        return 8;
+      }
+      if (card === '10') {
+        return 9;
+      }
+      if (card === 'J') {
+        return 10;
+      }
+      if (card === 'K') {
+        return 11;
+      }
+      if (card === 'Q') {
+        return 12;
+      }
+      return 13;
+
     }
   },
 };
