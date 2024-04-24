@@ -11,7 +11,7 @@
             <NuxtImg :src="'/cards/' + card + '.png'" v-for="card in currentCards.slice(0, 2)"/>
           </div>
           <h4 class="mt-3 mb-1">
-            {{ currentCards.length > 1 ? 'Chance of Winning: ' + chanceOfWinning.toFixed(2) + '%' : ''}}
+            {{ currentCards.length > 1 ? 'Chance of Winning: ' + chanceOfWinning : ''}}
           </h4>
           <h4>
             {{ currentCards.length > 1 ? 'Hand Ranking: ' + 0 + '/169': ''}}
@@ -98,105 +98,134 @@ export default {
   },
   methods: {
     showHandRanking() {
-      if (this.currentCards.length >= 2) {
+      const savedCurrentCards = this.currentCards;
+      const withoutHand = savedCurrentCards.slice(2);
+      if (savedCurrentCards.length >= 2) {
         let ahead = 0;
         let tied = 0;
         let behind = 0;
-        const ourRank = this.calcHandRanking(this.currentCards.slice(0, 2), this.currentCards.slice(2, 7));
+        const ourRank = this.calcHandRanking(savedCurrentCards);
+        const fullDeck = ['10C', '10D', '10H', '10S', '2C', '2D', '2H', '2S', '3C', '3D', '3H', '3S', '4C', '4D', '4H', '4S', '5C', '5D', '5H', '5S', '6C', '6D', '6H', '6S', '7C', '7D', '7H', '7S', '8C', '8D', '8H', '8S', '9C', '9D', '9H', '9S', 'AC', 'AD', 'AH', 'AS', 'JC', 'JD', 'JH', 'JS', 'KC', 'KD', 'KH', 'KS', 'QC', 'QD', 'QH', 'QS']
+        for (let card of savedCurrentCards) {
+          let indexToRemove = fullDeck.indexOf(card);
+          fullDeck.splice(indexToRemove, 1);
+        }
+        const combinations: [string, string][] = [];
+        for (let i = 0; i < fullDeck.length; i++) {
+          for (let j = i + 1; j < fullDeck.length; j++) {
+            combinations.push([fullDeck[i], fullDeck[j]]);
+          }
+        }
+        for (let combination of combinations) {
+          const possibility = withoutHand.concat(combination);
+          const oppRank = this.calcHandRanking(possibility);
+          if (ourRank > oppRank) {
+            ahead++
+          } else if (ourRank === oppRank) {
+            tied++
+          } else {
+            behind++
+          }
+        }
+        const value = (ahead + tied / 2) / (ahead + tied + behind)
+        this.chanceOfWinning = value
       }
     },
-    calcHandRanking(ourCards:string[], bordCards:string[]) {
-      const card1 = this.getCardValue(ourCards[0].substring(0, ourCards[0].length - 1));
-      const card2 = this.getCardValue(ourCards[1].substring(0, ourCards[1].length - 1));
-      const card1Suite = ourCards[0].substring(ourCards[0].length - 1);
-      const card2Suite = ourCards[1].substring(ourCards[1].length - 1);
-      const pairVal = this.checkPairing(card1, card2, bordCards)
-      const straightFlushValue = this.checkStraightFlush(card1, card2, bordCards, card1Suite, card2Suite)
-      console.log(straightFlushValue)
+    calcHandRanking(cards:string[]) {
+      const pairVal = this.checkPairing(cards);
+      const straightFlushValue = this.checkStraightFlush(cards);
+      return Math.max(pairVal, straightFlushValue);
     },
     //Checks for any straights or flushes or both
-    checkStraightFlush(card1:number, card2:number, bordCards:string[], suite1:string, suite2:string) {
-      let ordering = [card1, card2]
-      const suites = [0, 0, 0, 0]
-      this.checkSuite(suites, suite1);
-      this.checkSuite(suites, suite2);
-      for (let card of bordCards) {
-        const cardNum = this.getCardValue(card.substring(0, 1));
+    checkStraightFlush(cards:string[]) {
+      let ordering = []
+      const suiteCount: { [key: string]: number } = {'C': 0, 'S': 0, 'H': 0, 'D': 0};
+      for (let card of cards) {
+        const cardNum = this.getCardValue(card.substring(0, card.length - 1));
         const cardSuite = card.substring(card.length - 1);
-        this.checkSuite(suites, cardSuite);
+        suiteCount[cardSuite]++
         ordering.push(cardNum);
       }
       ordering = ordering.sort((a, b) => a - b);
-      let isInOrder = false;
-      let isFlush = false;
-      let inARow = 1;
+      let isFlush = null;
+      let inARow = [];
       for (let i = 1; i < ordering.length; i++) {
         if (ordering[i] === ordering[i - 1] + 1) {
-          inARow += 1;
-        } else {
-          inARow = 1;
-        }
-        if (inARow === 5) {
-          isInOrder = true
-        }
-      }
-      for (let i of suites) {
-        if (i >= 5) {
-          isFlush = true;
+          if (inARow.length === 0) {
+            inARow.push(ordering[i - 1])
+            inARow.push(ordering[i])
+          } else  {
+            inARow.push(ordering[i])
+          }
+        } else if (ordering[i] !== ordering[i - 1]){
+          inARow = [];
         }
       }
-      if (isInOrder && isFlush) {
-        if (JSON.stringify(ordering.slice(ordering.length - 5)) === JSON.stringify([9, 10, 11, 12, 13])) {
-          return 130;
+      for (let i of ['H', 'D', 'S', 'C']) {
+        if (suiteCount[i] >= 5) {
+          isFlush = i;
         }
-        return ordering[ordering.length - 1] + (13 * 8)
-      } else if (isFlush) {
+      }
+      if (inARow.length === 5 && isFlush) {
+        let numInRow = 0
+        for (let item of inARow) {
+          for (let card of cards) {
+            const cardNum = this.getCardValue(card.substring(0, card.length - 1));
+            const cardSuite = card.substring(card.length - 1);
+            if (cardNum === item && cardSuite === isFlush) {
+              numInRow++
+            }
+          }
+        }
+        if (numInRow === 5) {
+          if (JSON.stringify(inARow) === JSON.stringify([9, 10, 11, 12, 13])) {
+            return 130;
+          }
+          return ordering[ordering.length - 1] + (13 * 8)
+        }
+      }
+      if (isFlush) {
         return ordering[ordering.length - 1] + (13 * 5)
-      } else if (isInOrder) {
+      } else if (inARow.length === 5) {
         return ordering[ordering.length - 1] + (13 * 4)
       }
       return 0
     },
-
-    checkSuite(suites:number[], cardSuite:string) {
-      if (cardSuite.toUpperCase() === 'C') {
-        suites[0] += 1;
-      } else if (cardSuite.toUpperCase() === 'S') {
-        suites[1] += 1;
-      } else if (cardSuite.toUpperCase() === 'D') {
-        suites[2] += 1;
-      } else if (cardSuite.toUpperCase() === 'H') {
-        suites[3] += 1;
-      }
-    },
     /* Checks for high card, pair, two pair, three of a kind, full house and four of a kind **/
-    checkPairing(card1:number, card2:number, bordCards:string[]) {
-      const originalValue = Math.max(card1, card2)
-      let similarToFirstCard = 0;
-      let similarToSecondCard = 0;
-      if (card1 == card2) {
-        similarToFirstCard += 1
+    checkPairing(cards:string[]) {
+      let maxCardInHand = 0
+      const numCounts: { [key: number]: number } = {};
+      for (let card of cards) {
+        const cardNum = this.getCardValue(card.substring(0, card.length - 1));
+        if (numCounts[cardNum]) {
+          numCounts[cardNum]++;
+        } else {
+          numCounts[cardNum] = 1;
+        }
+        maxCardInHand = Math.max(cardNum, maxCardInHand)
       }
-      for (let card of bordCards) {
-        const cardNum = this.getCardValue(card.substring(0, 1));
-        if (cardNum === card1) {
-          similarToFirstCard += 1
-        } else if (cardNum === card2) {
-          similarToSecondCard += 1
+      let maxNumber = 1;
+      let secondMax = 1;
+      for (const num in numCounts) {
+        if (numCounts[num] > maxNumber) {
+          secondMax = maxNumber
+          maxNumber = numCounts[num]
+        } else if (numCounts[num] > secondMax) {
+          secondMax = numCounts[num]
         }
       }
-      if (similarToFirstCard === 3 || similarToSecondCard === 3) {
-        return originalValue + (13 * 7)
-      } else if ((similarToFirstCard === 2 && similarToSecondCard === 1) || (similarToFirstCard === 1 && similarToSecondCard === 2)) {
-        return originalValue + (13 * 6)
-      } else if (similarToFirstCard === 2 || similarToSecondCard === 2) {
-        return originalValue + (13 * 3)
-      } else if (similarToFirstCard === 1 && similarToSecondCard === 1) {
-        return originalValue + (13 * 2)
-      } else if (similarToFirstCard === 1 || similarToSecondCard === 1) {
-        return originalValue + 13
+      if (maxNumber >= 4) {
+        return maxCardInHand + (13 * 7)
+      } else if (maxNumber >= 3 && secondMax >= 2) {
+        return maxCardInHand + (13 * 6)
+      } else if (maxNumber === 3) {
+        return maxCardInHand + (13 * 3)
+      } else if (maxNumber === 2 && secondMax === 2) {
+        return maxCardInHand + (13 * 2)
+      } else if (maxNumber === 2) {
+        return maxCardInHand + 13
       }
-      return originalValue
+      return maxCardInHand
     },
 
     clearCurrentCards() {
