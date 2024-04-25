@@ -58,3 +58,15 @@ section {
     left: 80px;
   }
 }
+
+button {
+  background: #F1F1F1;
+  border: none;
+  color: #0a0a0a;
+  padding: 6px 14px;
+  border-radius: 5px;
+}
+
+button:hover {
+  opacity: 0.8;
+}

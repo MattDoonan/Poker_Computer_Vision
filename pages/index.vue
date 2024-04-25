@@ -5,11 +5,14 @@
       <div class="row">
         <div class="col-lg-4 col-12">
           <h3 class="mt-5">
-            {{ currentCards.length > 1 ? 'Current Hand' : (currentCards.length == 1 ? 'Need 2 cards' : 'Show Hand to start') }}
+            {{ playersHand.length > 1 ? 'Current Hand' : (playersHand.length == 1 ? 'Need 2 cards' : 'Show Hand to start') }}
           </h3>
-          <div class="show-cards">
-            <NuxtImg :src="'/cards/' + card + '.png'" v-for="card in currentCards.slice(0, 2)"/>
+          <div class="show-cards" v-if="playersHand.length > 0">
+            <NuxtImg :src="'/cards/' + card + '.png'" v-for="card in playersHand"/>
           </div>
+          <button @click="toggleSaveHand" class="mt-3" v-if="playersHand.length == 2">
+            {{!savedPlayersCards ? 'Save hand' : 'Clear hand'}}
+          </button>
           <h4 v-if="handStrength" class="mt-3 mb-1">
             {{ 'Current hand strength: ' + handStrength}}
           </h4>
@@ -20,11 +23,14 @@
             {{pot}}
           </h5>
           <h3 class="mt-4">
-            {{ currentCards.length > 2 ? 'Shared cards' : '' }}
+            {{ sharedCards.length > 0 ? 'Shared cards' : '' }}
           </h3>
           <div class="show-cards">
-            <NuxtImg :src="'/cards/' + card + '.png'" v-for="card in currentCards.slice(2, 7)"/>
+            <NuxtImg :src="'/cards/' + card + '.png'" v-for="card in sharedCards"/>
           </div>
+          <button @click="toggleSaveSharedCards" class="mt-3" v-if="sharedCards.length >= 3">
+            {{!savedSharedCards ? 'Save shared cards' : 'Clear shared cards'}}
+          </button>
         </div>
         <div class="col-6">
         </div>
@@ -46,7 +52,10 @@ import {type hand, possibleHands} from 'assets/typescript/handRakings'
 export default {
   data() {
     return {
-      currentCards: [],
+      playersHand: [],
+      sharedCards: [],
+      savedPlayersCards: false,
+      savedSharedCards: false,
       clearTimes: 0,
       cardTimes: 0,
       previousList: [],
@@ -84,7 +93,7 @@ export default {
           })
           const data = response.data.predictions;
           if (data.length === 0) {
-            this.clearCurrentCards();
+            this.clearCurrentCards(false);
           } else {
             const cards: string[] = [];
             for (let card of data) {
@@ -102,8 +111,8 @@ export default {
   },
   methods: {
     showHandRanking() {
-      const savedCurrentCards = this.currentCards;
-      const withoutHand = savedCurrentCards.slice(2);
+      const savedCurrentCards = this.playersHand.concat(this.sharedCards);
+      const withoutHand = this.sharedCards;
       if (savedCurrentCards.length >= 2) {
         let ahead = 0;
         let tied = 0;
@@ -132,11 +141,6 @@ export default {
           }
         }
         const value = ((ahead + tied / 2) / (ahead + tied + behind)) * 100
-        console.log(ahead)
-        console.log(tied)
-        console.log(behind)
-        console.log(value)
-        console.log('')
         if (90 <= value) {
           this.handStrength = "Very Strong"
         } else if (80 <= value && value < 90) {
@@ -188,18 +192,26 @@ export default {
             inARow.push(ordering[i])
             potentialInARow.push(ordering[i - 1])
             potentialInARow.push(ordering[i])
+            if (isOwnHand) {
+              console.log(potentialInARow)
+            }
           } else if (inARow.length >= 5) {
             inARow.splice(0, 1)
             inARow.push(ordering[i])
           } else  {
             inARow.push(ordering[i])
             potentialInARow.push(ordering[i])
+            if (isOwnHand) {
+              console.log(potentialInARow)
+            }
           }
         } else if (ordering[i] !== ordering[i - 1]){
           inARow = [];
           let addedPot = false
+          let resetLoop = false
           if (isOwnHand && cards.length > 4) {
             for (let y = 1; y <= (7 - cards.length - skipped); y++) {
+              console.log("hello")
               if (ordering[i] === ordering[i - 1] + 1 + y) {
                 addedPot = true;
                 skipped++;
@@ -210,10 +222,11 @@ export default {
                   potentialInARow.push(ordering[i]);
                 }
               }
-              if (!addedPot && potentialInARow.length + 7 - cards.length < 5 ) {
+              if (!addedPot && potentialInARow.length + 7 - cards.length < 5 && !resetLoop) {
                 potentialInARow = [];
                 skipped = 0;
                 y = 1;
+                resetLoop = true
               }
             }
           }
@@ -229,6 +242,9 @@ export default {
         }
       }
       if (7 - cards.length + potentialInARow.length >= 5 && isOwnHand && cards.length > 2) {
+        console.log(potentialInARow)
+        console.log(cards.length)
+        console.log(7 - cards.length + potentialInARow.length)
         this.potentialHands.push("Straight")
       }
       if (inARow.length === 5 && isFlush) {
@@ -305,18 +321,39 @@ export default {
       return maxCardInHand
     },
 
-    clearCurrentCards() {
-      if (this.currentCards.length !== 0) {
-        this.clearTimes = this.clearTimes + 1;
-      } else {
+    clearCurrentCards(btnClick: boolean) {
+      if (btnClick) {
         this.clearTimes = 0
+        this.reset()
+      } else {
+        if (this.playerHand !== 0) {
+          this.clearTimes = this.clearTimes + 1;
+        } else {
+          this.clearTimes = 0
+        }
+        if (this.clearTimes === 20) {
+          this.clearTimes = 0
+          if (!this.savedPlayersCards && !this.savedSharedCards) {
+            this.reset()
+          } else if (this.savedSharedCards && !this.savedPlayersCards) {
+            this.playersHand = []
+            this.potentialHands = []
+            this.handStrength = null
+          } else if (!this.savedSharedCards && this.savedPlayersCards) {
+            this.sharedCards = []
+            this.showHandRanking()
+          }
+        }
       }
-      if (this.clearTimes === 20) {
-        this.currentCards = []
-        this.handStrength = null
-        this.potentialHands = []
-        this.cardTimes = 0
-      }
+    },
+    reset() {
+      this.playersHand = []
+      this.sharedCards = []
+      this.handStrength = null
+      this.potentialHands = []
+      this.cardTimes = 0
+      this.savedPlayersCards = false
+      this.savedSharedCards = false
     },
     checkSameList(list1:string[], list2:string[]) {
       if (list1.length !== list2.length) {
@@ -330,24 +367,76 @@ export default {
       return true;
     },
     updateCurrentCards(cards:string[]) {
-      const sortedCards = cards.sort();
-      this.clearTimes = 0
-      if (this.currentCards.length === 0) {
-        this.cardTimes = 0
-        this.currentCards = sortedCards
-        this.showHandRanking()
-      } else {
-        if (this.checkSameList(this.currentCards, sortedCards)) {
+      const cardTimeMax = 10;
+      if (this.playersHand.length < 2) {
+        this.playersHand = cards.slice(0, 2)
+        this.sharedCards = cards.slice(2)
+      } else if (this.savedPlayersCards && this.savedSharedCards) {
+        if (cards.length !== this.sharedCards + 2) {
+          if (this.cardTimes >=  cardTimeMax) {
+            this.addCardsToShared(cards)
+          } else if (this.checkSameList(this.previousList, cards)) {
+            this.cardTimes = this.cardTimes + 1
+          } else  {
+            this.cardTimes = 0
+            this.previousList = cards;
+          }
+        }
+      } else if (this.savedSharedCards) {
+        if (this.checkSameList(this.playersHand, cards.slice(0, 2))) {
           this.cardTimes = 0
-        } else if (this.checkSameList(this.previousList, sortedCards)) {
+        } else if (this.checkSameList(this.previousList, cards)) {
           this.cardTimes = this.cardTimes + 1
-        } else  {
+        } else {
           this.cardTimes = 0
-          this.previousList = sortedCards;
+          this.previousList = cards;
+        }
+        if (this.cardTimes >= cardTimeMax) {
+          this.playersHand = this.previousList.slice(0, 2)
+        }
+      } else if (this.savedPlayersCards) {
+        if (this.sharedCards.length < 3) {
+          this.addCardsToShared(cards)
+        } else {
+          if (this.checkSameList(this.sharedCards, cards.slice(2))) {
+            this.cardTimes = 0
+          } else if (this.checkSameList(this.previousList, cards)) {
+            this.cardTimes = this.cardTimes + 1
+          } else {
+            this.cardTimes = 0
+            this.previousList = cards;
+          }
+          if (this.cardTimes >= cardTimeMax) {
+            this.sharedCards = this.previousList.slice(2)
+            this.showHandRanking()
+          }
+        }
+      } else {
+        if (this.sharedCards.length <  3) {
+          this.addCardsToShared(cards)
+        }
+        if (this.checkSameList(this.sharedCards, cards.slice(2)) && this.checkSameList(this.playersHand, cards.slice(0, 2))) {
+          this.cardTimes = 0
+        } else if (this.checkSameList(this.previousList, cards)) {
+          this.cardTimes = this.cardTimes + 1
+        } else {
+          this.cardTimes = 0
+          this.previousList = cards;
+        }
+        if (this.cardTimes >= cardTimeMax) {
+          this.sharedCards = this.previousList.slice(2)
+          this.playersHand = this.previousList.slice(0, 2)
         }
       }
-      if (this.cardTimes >= 3) {
-        this.currentCards = this.previousList
+    },
+    addCardsToShared(cards:string[]) {
+      this.cardTimes = 0
+      for (let card of cards) {
+        if (!this.sharedCards.includes(card) && !this.playersHand.includes(card) && this.sharedCards.length < 5) {
+          this.sharedCards.push(card)
+        }
+      }
+      if (this.savedPlayersCards) {
         this.showHandRanking()
       }
     },
@@ -389,6 +478,19 @@ export default {
         return 12;
       }
       return 13;
+
+    },
+    toggleSaveHand() {
+      this.savedPlayersCards = !this.savedPlayersCards;
+      if (this.savedPlayersCards) {
+        this.showHandRanking()
+      }
+    },
+    toggleSaveSharedCards() {
+      this.savedSharedCards = !this.savedSharedCards;
+      if (this.savedPlayersCards) {
+        this.showHandRanking()
+      }
 
     }
   },
